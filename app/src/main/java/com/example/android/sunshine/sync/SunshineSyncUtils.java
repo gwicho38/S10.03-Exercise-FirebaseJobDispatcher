@@ -22,16 +22,65 @@ import android.net.Uri;
 import android.support.annotation.NonNull;
 
 import com.example.android.sunshine.data.WeatherContract;
+import com.firebase.jobdispatcher.Constraint;
+import com.firebase.jobdispatcher.Driver;
+import com.firebase.jobdispatcher.FirebaseJobDispatcher;
+import com.firebase.jobdispatcher.GooglePlayDriver;
+import com.firebase.jobdispatcher.Job;
+import com.firebase.jobdispatcher.Lifetime;
+import com.firebase.jobdispatcher.Trigger;
+
+import java.util.concurrent.TimeUnit;
 
 public class SunshineSyncUtils {
 
-//  TODO (10) Add constant values to sync Sunshine every 3 - 4 hours
+//  complete (10) Add constant values to sync Sunshine every 3 - 4 hours
+
+    private static final int SYNC_INTERVAL_HOURS = 3;
+    private static final int SYNC_INTERVAL_SECONDS = (int) TimeUnit.HOURS.toSeconds(SYNC_INTERVAL_HOURS);
+    private static final int SYNC_FLEXTIME_SECONDS = SYNC_INTERVAL_SECONDS / 3;
 
     private static boolean sInitialized;
 
-//  TODO (11) Add a sync tag to identify our sync job
+//  complete (11) Add a sync tag to identify our sync job
+    private static final String SUNSHINE_SYNC_TAG = "sunshine-sync";
 
-//  TODO (12) Create a method to schedule our periodic weather sync
+//  complete (12) Create a method to schedule our periodic weather sync
+
+    static void scheduleWeatherSync(@NonNull Context context){
+
+        Driver driver = new GooglePlayDriver(context);
+        FirebaseJobDispatcher dispatcher = new FirebaseJobDispatcher(driver);
+
+        /* Create the Job to periodically create reminders to drink water */
+        Job constraintReminderJob = dispatcher.newJobBuilder()
+                .setService(SunshineFirebaseJobService.class)
+                .setTag(SUNSHINE_SYNC_TAG)
+                .setRecurring(true)
+                .setConstraints(Constraint.ON_ANY_NETWORK)
+                .setLifetime(Lifetime.FOREVER)
+                /*
+                 * We want the reminders to happen every 15 minutes or so. The first argument for
+                 * Trigger class's static executionWindow method is the start of the time frame
+                 * when the
+                 * job should be performed. The second argument is the latest point in time at
+                 * which the data should be synced. Please note that this end time is not
+                 * guaranteed, but is more of a guideline for FirebaseJobDispatcher to go off of.
+                 */
+                .setTrigger(Trigger.executionWindow(
+                        SYNC_INTERVAL_SECONDS,
+                        SYNC_INTERVAL_SECONDS + SYNC_FLEXTIME_SECONDS))
+                /*
+                 * If a Job with the tag with provided already exists, this new job will replace
+                 * the old one.
+                 */
+                .setReplaceCurrent(true)
+                /* Once the Job is ready, call the builder's build method to return the Job */
+                .build();
+
+        /* Schedule the Job with the dispatcher */
+        dispatcher.schedule(constraintReminderJob);
+    }
 
     /**
      * Creates periodic sync tasks and checks to see if an immediate sync is required. If an
@@ -50,7 +99,8 @@ public class SunshineSyncUtils {
 
         sInitialized = true;
 
-//      TODO (13) Call the method you created to schedule a periodic weather sync
+//      complete (13) Call the method you created to schedule a periodic weather sync
+        scheduleWeatherSync(context);
 
         /*
          * We need to check to see if our ContentProvider has data to display in our forecast
